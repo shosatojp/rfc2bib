@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import sys
 from typing import Any, Dict
 import time
 import requests
@@ -17,20 +18,27 @@ def get_metadata(doc_id: str) -> Dict[str, Any]:
 
 
 def generate_bibtex(citekey: str, metadata: Dict[str, Any]) -> str:
-    txt = ""
-    txt += f"@techreport{{{citekey},\n"
+    fields: Dict[str, str] = {}
     if "title" in metadata:
-        txt += f"  title = {{{metadata['title']}}},\n"
+        fields["title"] = metadata["title"]
     if "authors" in metadata:
-        authorlist = " and ".join(
-            ["{" + author + "}" for author in metadata["authors"]]
+        fields["author"] = " and ".join(
+            ["{" + author.strip() + "}" for author in metadata["authors"]]
         )
-        txt += f"  author = {{{authorlist}}},\n"
     if "pub_date" in metadata:
-        pub_date = time.strptime(metadata["pub_date"], "%B %Y")
-        txt += f"  year = {{{pub_date.tm_year}}},\n"
-        txt += f"  month = {{{pub_date.tm_mon}}},\n"
-    txt += f"  url = {{https://www.ietf.org/rfc/{metadata['doc_id'].lower()}}},\n"
+        pub_date = time.strptime(metadata["pub_date"].strip(), "%B %Y")
+        fields["year"] = pub_date.tm_year
+        fields["month"] = pub_date.tm_mon
+    fields["url"] = f"https://www.ietf.org/rfc/{metadata['doc_id'].strip().lower()}"
+
+    # generate bibtex text
+    max_key_length = max([len(k) for k in fields.keys()])
+
+    INDENT = " " * 2
+    txt = f"@techreport{{{citekey},\n"
+    for k, v in fields.items():
+        pad = " " * (max_key_length - len(k))
+        txt += INDENT + f"{k}{pad} = {{{v}}},\n"
     txt += "}"
 
     return txt
@@ -40,9 +48,22 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("doc_id", help="e.g. rfc7777")
+    parser.add_argument("doc_ids", nargs="+", help="e.g. rfc7777")
+    parser.add_argument("--output", "-o")
     args = parser.parse_args()
 
-    metadata = get_metadata(args.doc_id)
-    txt = generate_bibtex(args.doc_id.lower(), metadata)
-    print(txt)
+    bibtex_list = []
+    for doc_id in args.doc_ids:
+        print(f"fetching {doc_id}", file=sys.stderr)
+        metadata = get_metadata(doc_id.lower())
+        bibtex = generate_bibtex(doc_id.lower(), metadata)
+        bibtex_list.append(bibtex)
+
+    bibtex_all = "\n\n".join(bibtex_list)
+    if args.output:
+        with open(args.output, "wt", encoding="utf-8") as fp:
+            fp.write("% generated with:\n")
+            fp.write(f"% {' '.join(sys.argv)}\n\n")
+            fp.write(bibtex_all)
+    else:
+        print(bibtex_all)
