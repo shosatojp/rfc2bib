@@ -27,7 +27,7 @@ def generate_bibtex(citekey: str, metadata: Dict[str, Any]) -> str:
         )
         txt += f"  author = {{{authorlist}}},\n"
     if "pub_date" in metadata:
-        pub_date = time.strptime("March 2016", "%B %Y")
+        pub_date = time.strptime(metadata["pub_date"], "%B %Y")
         txt += f"  year = {{{pub_date.tm_year}}},\n"
         txt += f"  month = {{{pub_date.tm_mon}}},\n"
     txt += f"  url = {{https://www.ietf.org/rfc/{metadata['doc_id'].lower()}}},\n"
