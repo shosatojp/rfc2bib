@@ -3,6 +3,7 @@ import sys
 from typing import Any, Dict
 import time
 import requests
+import string
 
 
 def get_metadata(doc_id: str) -> Dict[str, Any]:
@@ -17,10 +18,22 @@ def get_metadata(doc_id: str) -> Dict[str, Any]:
         raise e
 
 
+def generate_slug(s: str) -> str:
+    return "".join(
+        [
+            c
+            for c in s.strip().lower().replace(" ", "-")
+            if c in string.ascii_lowercase + string.digits + "-"
+        ]
+    )
+
+
 def generate_bibtex(citekey: str, metadata: Dict[str, Any]) -> str:
     fields: Dict[str, str] = {}
+    slug = None
     if "title" in metadata:
-        fields["title"] = metadata["title"]
+        fields["title"] = metadata["title"].strip()
+        slug = generate_slug(metadata["title"].strip())
     if "authors" in metadata:
         fields["author"] = " and ".join(
             ["{" + author.strip() + "}" for author in metadata["authors"]]
@@ -29,13 +42,13 @@ def generate_bibtex(citekey: str, metadata: Dict[str, Any]) -> str:
         pub_date = time.strptime(metadata["pub_date"].strip(), "%B %Y")
         fields["year"] = pub_date.tm_year
         fields["month"] = pub_date.tm_mon
-    fields["url"] = f"https://www.ietf.org/rfc/{metadata['doc_id'].strip().lower()}"
+    fields["url"] = f"https://www.ietf.org/rfc/{metadata['doc_id'].strip().lower()}.txt"
 
     # generate bibtex text
     max_key_length = max([len(k) for k in fields.keys()])
 
     INDENT = " " * 2
-    txt = f"@techreport{{{citekey},\n"
+    txt = f"@techreport{{{citekey}{'-' + slug if slug else ''},\n"
     for k, v in fields.items():
         pad = " " * (max_key_length - len(k))
         txt += INDENT + f"{k}{pad} = {{{v}}},\n"
